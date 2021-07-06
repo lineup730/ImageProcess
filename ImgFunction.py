@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 '''
 img:    input image
@@ -48,3 +49,24 @@ def resize_img(img, scale):
     resize_img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)  
 
     return resize_img
+
+'''
+img:    input image
+scale:  scale factor 0.01~100
+'''
+def modify_intensity(img, scale):
+
+    if scale < 0.01 or scale > 100:
+        return img
+
+    maxIntensity = 255.0 # depends on dtype of image data
+
+    # Parameters for manipulating image data
+    phi = 1
+    theta = 1
+
+    # Modify intensity 
+    process_img = (maxIntensity/phi)*(img/(maxIntensity/theta))**scale
+    process_img = np.array(process_img, dtype=np.uint8)
+
+    return process_img

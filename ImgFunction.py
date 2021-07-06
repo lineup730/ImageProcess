@@ -117,3 +117,66 @@ def modify_saturation(img, scale):
     result_img = ((result_img * 255).astype(np.uint8))
 
     return result_img
+
+'''
+B, G ,R:    -255 ~ +255
+'''
+def modify_color_temperature(img, B, G ,R):
+
+    # ---------------- 冷色調 ---------------- #  
+
+#     height = img.shape[0]
+#     width = img.shape[1]
+#     dst = np.zeros(img.shape, img.dtype)
+
+    # 1.計算三個通道的平均值，並依照平均值調整色調
+    imgB = img[:, :, 0] 
+    imgG = img[:, :, 1]
+    imgR = img[:, :, 2] 
+
+    # 調整色調請調整這邊~~ 
+    # 白平衡 -> 三個值變化相同
+    # 冷色調(增加b分量) -> 除了b之外都增加
+    # 暖色調(增加r分量) -> 除了r之外都增加
+    bAve = cv2.mean(imgB)[0] + B
+    gAve = cv2.mean(imgG)[0] + G
+    rAve = cv2.mean(imgR)[0] + R
+    aveGray = (int)(bAve + gAve + rAve) / 3
+
+    # 2. 計算各通道增益係數，並使用此係數計算結果
+    bCoef = aveGray / bAve
+    gCoef = aveGray / gAve
+    rCoef = aveGray / rAve
+    imgB = np.floor((imgB * bCoef))  # 向下取整
+    imgG = np.floor((imgG * gCoef))
+    imgR = np.floor((imgR * rCoef))
+
+    # 3. 變換後處理
+#     for i in range(0, height):
+#         for j in range(0, width):
+#             imgb = imgB[i, j]
+#             imgg = imgG[i, j]
+#             imgr = imgR[i, j]
+#             if imgb > 255:
+#                 imgb = 255
+#             if imgg > 255:
+#                 imgg = 255
+#             if imgr > 255:
+#                 imgr = 255
+#             dst[i, j] = (imgb, imgg, imgr)
+
+    # 將原文第3部分的演算法做修改版，加快速度
+    imgb = imgB
+    imgb[imgb > 255] = 255
+    imgb[imgb < 0] = 0
+
+    imgg = imgG
+    imgg[imgg > 255] = 255
+    imgg[imgg < 0] = 0
+
+    imgr = imgR
+    imgr[imgr > 255] = 255
+    imgr[imgr < 0] = 0
+
+    cold_rgb = np.dstack((imgb, imgg, imgr)).astype(np.uint8) 
+    return cold_rgb

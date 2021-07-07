@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 '''
 img:    input image
@@ -40,8 +41,8 @@ scale:  scale factor 1~100
 '''
 def resize_img(img, scale):
 
-    if scale <= 0 or scale > 100:
-        return image
+    # 0 <= sigma <= 1
+    scale = np.clip(scale, 1 , 100)
 
     width = int(img.shape[1] * scale / 100) # 縮放後圖片寬度
     height = int(img.shape[0] * scale / 100) # 縮放後圖片高度
@@ -180,3 +181,78 @@ def modify_color_temperature(img, B, G ,R):
 
     cold_rgb = np.dstack((imgb, imgg, imgr)).astype(np.uint8) 
     return cold_rgb
+
+def gaussian_noise(img, mean=0, sigma=0.1):
+
+    # 0 <= sigma <= 1
+    sigma = np.clip(sigma, 0 , 1)
+
+    # int -> float (標準化)
+    img = img / 255
+    # 隨機生成高斯 noise (float + float)
+    noise = np.random.normal(mean, sigma, img.shape)
+    # noise + 原圖
+    gaussian_out = img + noise
+    # 所有值必須介於 0~1 之間，超過1 = 1，小於0 = 0
+    gaussian_out = np.clip(gaussian_out, 0, 1)
+
+    # 原圖: float -> int (0~1 -> 0~255)
+    gaussian_out = np.uint8(gaussian_out*255)
+    # noise: float -> int (0~1 -> 0~255)
+    noise = np.uint8(noise*255)
+
+    return gaussian_out
+
+
+'''
+contrast    : -255~255
+'''
+def modify_contrast(img, contrast):
+    
+    #增加對比度: 白的更白，黑的更黑
+    #減少對比度: 白黑都接近灰
+    
+    c = contrast / 255.0 
+
+    #tan > 45度: y>x，為分數 (0~1)，表示更接近0
+    #tan < 45度: x>y，為假分數 (>1)，表示更遠離0
+    
+    #將 c 代入，得到約 tan((1~89)/180*pi)，
+    k = math.tan((45 + 44 * c) / 180 * math.pi)
+
+    #我們從255的一半 127.5開始看，
+    #後面127.5是正的
+    #前面127.5是負的，因為乘上k，
+    #k可以決定要更大的負(整個式子結果更負)或更小的負(整個式子結果更正)
+    img = (img - 127.5) * k + 127.5
+
+    # 所有值必須介於 0~255 之間，超過255 = 255，小於 0 = 0
+    img = np.clip(img, 0, 255).astype(np.uint8)
+
+    return img
+
+
+
+def reduce_highlights(img, alpha = 0.2, beta = 0.4):
+
+    alpha = float(np.clip(alpha, 0 , 2))
+    beta = float(np.clip(beta, 0 , 2))
+
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # 先轉成灰階處理
+    ret, thresh = cv2.threshold(img_gray, 200, 255, 0)  # 利用 threshold 過濾出高光的部分，目前設定高於 200 即為高光
+    contours, hierarchy  = cv2.findContours(thresh.copy(),cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    img_zero = np.zeros(img.shape, dtype=np.uint8) 
+
+#     print(len(contours))
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour) 
+        img_zero[y:y+h, x:x+w] = 255 
+        mask = img_zero 
+
+    # alpha，beta 共同決定高光消除後的模糊程度
+    # alpha: 亮度的缩放因子，默認是 0.2， 範圍[0, 2], 值越大，亮度越低
+    # beta:  亮度缩放後加上的参数，默認是 0.4， 範圍[0, 2]，值越大，亮度越低
+    result = cv2.illuminationChange(img, mask, alpha, beta) 
+
+    return result
